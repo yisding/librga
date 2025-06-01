@@ -1321,16 +1321,7 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
     if (src1)
         NormalRgaSetPatActiveInfo(&rgaReg, src1ActW, src1ActH, src1XPos, src1YPos);
 
-    if (dst->color_space_mode & full_csc_mask) {
-        ret = NormalRgaFullColorSpaceConvert(&rgaReg, dst->color_space_mode);
-        if (ret < 0) {
-            ALOGE("Not support full csc mode [%x]\n", dst->color_space_mode);
-            return -EINVAL;
-        }
-
-        if (dst->color_space_mode == rgb2yuv_709_limit)
-            yuvToRgbMode |= 0x3 << 2;
-    } else {
+    {
         if (src1) {
             /* special config for yuv + rgb => rgb */
             /* src0 y2r, src1 bupass, dst bupass */
@@ -1368,6 +1359,17 @@ int RgaBlit(rga_info *src, rga_info *dst, rga_info *src1) {
 
         if(dst->color_space_mode > 0)
             yuvToRgbMode = dst->color_space_mode;
+    }
+
+    if (dst->color_space_mode & full_csc_mask) {
+        ret = NormalRgaFullColorSpaceConvert(&rgaReg, dst->color_space_mode & full_csc_mask);
+        if (ret < 0) {
+            ALOGE("Not support full csc mode [%x]\n", dst->color_space_mode & full_csc_mask);
+            return -EINVAL;
+        }
+
+        if (dst->color_space_mode == rgb2yuv_709_limit)
+            yuvToRgbMode |= 0x3 << 2;
     }
 
     /* mode

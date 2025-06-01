@@ -33,6 +33,8 @@
 #include "drmrga.h"
 #include "rga.h"
 
+#define RGA_NORMAL_DST_FULL_CSC_FIXUP 1
+
 #ifdef __cplusplus
 extern "C"{
 #endif
