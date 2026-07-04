@@ -258,7 +258,7 @@ int get_pixel_stride(buffer_handle_t handle, int* pixel_stride)
 
         if ( layouts.size() > 1 )
         {
-            ALOGW("it's not reasonable to get global pixel_stride of buffer with planes more than 1.");
+            // ALOGW("it's not reasonable to get global pixel_stride of buffer with planes more than 1.");
         }
 
         *pixel_stride = (layouts[0].widthInSamples);

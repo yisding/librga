@@ -17,6 +17,7 @@
  */
 
 #include "rga.h"
+#include "im2d_type.h"
 #include "utils.h"
 
 bool is_bpp_format(int format) {
@@ -58,6 +59,7 @@ bool is_yuv_format(int format) {
         case RK_FORMAT_UYVY_420:
         case RK_FORMAT_Y8:
         case RK_FORMAT_Y4:
+        case RK_FORMAT_Y1:
         case RK_FORMAT_YCbCr_400:
         case RK_FORMAT_YCbCr_420_SP_10B:
         case RK_FORMAT_YCrCb_420_SP_10B:
@@ -141,6 +143,24 @@ bool is_alpha_format(int format) {
         case RK_FORMAT_BGRX_1010102:
         case RK_FORMAT_XRGB_2101010:
         case RK_FORMAT_XBGR_2101010:
+            ret = true;
+            break;
+        default:
+            break;
+    }
+
+    return ret;
+}
+
+bool is_full_range(int color_space_mode) {
+    bool ret = false;
+
+    switch (color_space_mode) {
+        case IM_RGB_FULL_RANGE:
+        case IM_RGB_BT2020_FULL_RANGE:
+        case IM_YUV_BT601_FULL_RANGE:
+        case IM_YUV_BT709_FULL_RANGE:
+        case IM_YUV_BT2020_FULL_RANGE:
             ret = true;
             break;
         default:

@@ -73,6 +73,7 @@ typedef enum {
     IM_RGA_SUPPORT_FORMAT_Y8_INDEX,
     IM_RGA_SUPPORT_FORMAT_RGBA_1010102_INDEX,
     IM_RGA_SUPPORT_FORMAT_YUV_444_PACED_10_BIT_INDEX,
+    IM_RGA_SUPPORT_FORMAT_Y1_INDEX,
     IM_RGA_SUPPORT_FORMAT_MASK_INDEX,
 } IM_RGA_SUPPORT_FORMAT_INDEX;
 
@@ -100,6 +101,7 @@ typedef enum {
     IM_RGA_SUPPORT_FORMAT_Y8                            = 1 << IM_RGA_SUPPORT_FORMAT_Y8_INDEX,
     IM_RGA_SUPPORT_FORMAT_RGBA_1010102                  = 1 << IM_RGA_SUPPORT_FORMAT_RGBA_1010102_INDEX,
     IM_RGA_SUPPORT_FORMAT_YUV_444_PACED_10_BIT          = 1 << IM_RGA_SUPPORT_FORMAT_YUV_444_PACED_10_BIT_INDEX,
+    IM_RGA_SUPPORT_FORMAT_Y1                            = 1 << IM_RGA_SUPPORT_FORMAT_Y1_INDEX,
     IM_RGA_SUPPORT_FORMAT_MASK                          = ~((~(unsigned int)0x0 << IM_RGA_SUPPORT_FORMAT_MASK_INDEX) | 1),
 } IM_RGA_SUPPORT_FORMAT;
 
@@ -110,7 +112,7 @@ typedef enum {
     IM_RGA_SUPPORT_FEATURE_ROP_INDEX,
     IM_RGA_SUPPORT_FEATURE_QUANTIZE_INDEX,
     IM_RGA_SUPPORT_FEATURE_SRC1_R2Y_CSC_INDEX,
-    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V1_INDEX,
     IM_RGA_SUPPORT_FEATURE_FBC_INDEX,
     IM_RGA_SUPPORT_FEATURE_BLEND_YUV_INDEX,
     IM_RGA_SUPPORT_FEATURE_BT2020_INDEX,
@@ -120,6 +122,9 @@ typedef enum {
     IM_RGA_SUPPORT_FEATURE_ALPHA_BIT_MAP_INDEX,
     IM_RGA_SUPPORT_FEATURE_GAUSS_INDEX,
     IM_RGA_SUPPORT_FEATURE_SECURE_INDEX,
+    IM_RGA_SUPPORT_FEATURE_CFA_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V2_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V3_INDEX,
     IM_RGA_SUPPORT_FEATURE_MASK_INDEX,
 } IM_RGA_SUPPORT_FEATURE_INDEX;
 
@@ -130,7 +135,7 @@ typedef enum {
     IM_RGA_SUPPORT_FEATURE_ROP            = 1 << IM_RGA_SUPPORT_FEATURE_ROP_INDEX,
     IM_RGA_SUPPORT_FEATURE_QUANTIZE       = 1 << IM_RGA_SUPPORT_FEATURE_QUANTIZE_INDEX,
     IM_RGA_SUPPORT_FEATURE_SRC1_R2Y_CSC   = 1 << IM_RGA_SUPPORT_FEATURE_SRC1_R2Y_CSC_INDEX,
-    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC   = 1 << IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V1      = 1 << IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V1_INDEX,
     IM_RGA_SUPPORT_FEATURE_FBC            = 1 << IM_RGA_SUPPORT_FEATURE_FBC_INDEX,
     IM_RGA_SUPPORT_FEATURE_BLEND_YUV      = 1 << IM_RGA_SUPPORT_FEATURE_BLEND_YUV_INDEX,
     IM_RGA_SUPPORT_FEATURE_BT2020         = 1 << IM_RGA_SUPPORT_FEATURE_BT2020_INDEX,
@@ -140,6 +145,12 @@ typedef enum {
     IM_RGA_SUPPORT_FEATURE_ALPHA_BIT_MAP  = 1 << IM_RGA_SUPPORT_FEATURE_ALPHA_BIT_MAP_INDEX,
     IM_RGA_SUPPORT_FEATURE_GAUSS          = 1 << IM_RGA_SUPPORT_FEATURE_GAUSS_INDEX,
     IM_RGA_SUPPORT_FEATURE_SECURE         = 1 << IM_RGA_SUPPORT_FEATURE_SECURE_INDEX,
+    IM_RGA_SUPPORT_FEATURE_CFA            = 1 << IM_RGA_SUPPORT_FEATURE_CFA_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V2      = 1 << IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V2_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V3      = 1 << IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V3_INDEX,
+    IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_MASK    = IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V1 |
+                                                  IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V2 |
+                                                  IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V3,
     IM_RGA_SUPPORT_FEATURE_MASK           = ~((~(unsigned int)0x0 << IM_RGA_SUPPORT_FEATURE_MASK_INDEX) | 1),
 } IM_RGA_SUPPORT_FEATURE;
 
@@ -159,7 +170,8 @@ typedef struct {
     unsigned int output_format;
     unsigned int feature;
     unsigned int scale_ver_bicubic_limit;
-    char reserved[20];
+    unsigned int pixel_depth;
+    char reserved[16];
 } rga_info_table_entry;
 
 typedef struct {
@@ -168,7 +180,7 @@ typedef struct {
 } rga_version_bind_table_entry_t;
 
 static const rga_info_table_entry hw_info_table[] = {
-    { IM_RGA_HW_VERSION_RGA_V_ERR       , {0, 0}, {0, 0}, 0, 0, 0, 0, 0, 0, 0, (char){0} },
+    { IM_RGA_HW_VERSION_RGA_V_ERR       , {0, 0}, {0, 0}, 0, 0, 0, 0, 0, 0, 0, 0, (char){0} },
     {   IM_RGA_HW_VERSION_RGA_1         , {8192, 8192}, {2048, 2048}, 4, 8, 1,
                                         /* input format */
                                         IM_RGA_SUPPORT_FORMAT_RGB |
@@ -192,6 +204,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_ROP,
                                         /* special limit */
                                         0,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_1_PLUS      , {8192, 8192}, {4096, 4096}, 4, 8, 1,
@@ -216,6 +230,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_COLOR_PALETTE,
                                         /* special limit */
                                         0,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_2           , {8192, 8192}, {4096, 4096}, 4, 16, 2,
@@ -240,6 +256,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_ROP,
                                         /* special limit */
                                         1928,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_2_LITE0     , {8192, 8192}, {4096, 4096}, 4, 8, 2,
@@ -264,6 +282,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_ROP,
                                         /* special limit */
                                         1928,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_2_LITE1     , {8192, 8192}, {4096, 4096}, 4, 8, 2,
@@ -291,6 +311,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_COLOR_PALETTE,
                                         /* special limit */
                                         1928,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_2_ENHANCE   , {8192, 8192}, {4096, 4096}, 4, 16,  2,
@@ -321,6 +343,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_ROP,
                                         /* special limit */
                                         1928,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_2_PRO       , {8192, 8192}, {8192, 8192}, 4, 16,  2,
@@ -360,13 +384,15 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_ROP |
                                         IM_RGA_SUPPORT_FEATURE_QUANTIZE |
                                         IM_RGA_SUPPORT_FEATURE_SRC1_R2Y_CSC |
-                                        IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC |
+                                        IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V3 |
                                         IM_RGA_SUPPORT_FEATURE_MOSAIC |
                                         IM_RGA_SUPPORT_FEATURE_OSD |
                                         IM_RGA_SUPPORT_FEATURE_PRE_INTR |
                                         IM_RGA_SUPPORT_FEATURE_ALPHA_BIT_MAP,
                                         /* special limit */
                                         1928,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
     { IM_RGA_HW_VERSION_RGA_2_LITE2     , {2880, 8192}, {2880, 8192}, 4, 16, 2,
@@ -395,9 +421,12 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FORMAT_YUYV_422,
                                         /* feature */
                                         IM_RGA_SUPPORT_FEATURE_COLOR_FILL |
-                                        IM_RGA_SUPPORT_FEATURE_COLOR_PALETTE ,
+                                        IM_RGA_SUPPORT_FEATURE_COLOR_PALETTE |
+                                        IM_RGA_SUPPORT_FEATURE_DST_FULL_CSC_V3,
                                         /* special limit */
                                         0,
+                                        /* pixel depth */
+                                        8,
                                         /* reserved */
                                         (char){0} },
 
@@ -422,6 +451,8 @@ static const rga_info_table_entry hw_info_table[] = {
                                         IM_RGA_SUPPORT_FEATURE_BT2020,
                                         /* special limit */
                                         8128,
+                                        /* pixel depth */
+                                        10,
                                         /* reserved */
                                         (char){0} },
 };

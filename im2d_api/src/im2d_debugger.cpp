@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <inttypes.h>
 
 #include "im2d_debugger.h"
 #include "im2d_impl.h"
@@ -74,18 +75,26 @@ const char *string_color_space(uint32_t mode) {
             return "rgb-to-y1-dither";
         case IM_COLOR_SPACE_DEFAULT:
             return "default";
-        case IM_RGB_FULL:
-            return "rgb_full";
-        case IM_RGB_CLIP:
-            return "rga_clip";
+        case IM_RGB_FULL_RANGE:
+            return "rgb-full";
+        case IM_RGB_LIMIT_RANGE:
+            return "rgb-limit";
+        case IM_RGB_BT2020_LIMIT_RANGE:
+            return "rgb-bt.2020-limit";
+        case IM_RGB_BT2020_FULL_RANGE:
+            return "rgb-bt.2020-full";
         case IM_YUV_BT601_LIMIT_RANGE:
-            return "yuv_bt.601-limit";
+            return "yuv-bt.601-limit";
         case IM_YUV_BT601_FULL_RANGE:
-            return "yuv_bt.601-full";
+            return "yuv-bt.601-full";
         case IM_YUV_BT709_LIMIT_RANGE:
-            return "yuv_bt.709-limit";
+            return "yuv-bt.709-limit";
         case IM_YUV_BT709_FULL_RANGE:
-            return "yuv_bt.709-full";
+            return "yuv-bt.709-full";
+        case IM_YUV_BT2020_LIMIT_RANGE:
+            return "yuv-bt.2020-limit";
+        case IM_YUV_BT2020_FULL_RANGE:
+            return "yuv-bt.2020-full";
         default:
             return "unknown";
     }
@@ -193,6 +202,40 @@ const char *string_colorkey_mode(uint32_t mode) {
     }
 }
 
+const char * string_cfa_type(uint32_t type) {
+    switch (type) {
+        case IM_CFA_TYPE_DEFAULT:
+            return "default";
+        case IM_CFA_TYPE_REGAL:
+            return "regal";
+        case IM_CFA_TYPE_A2:
+            return "A2";
+        default:
+            return "unknown";
+    }
+}
+
+const char * string_cfa_pattern(uint32_t pattern) {
+    switch (pattern) {
+        case IM_CFA_PATTERN_GRAY:
+            return "gray";
+        case IM_CFA_PATTERN_3x3_RGBGBRBRG:
+            return "3x3 RGBGBRBRG";
+        case IM_CFA_PATTERN_3x3_GBRBRGRGB:
+            return "3x3 GBRBRGRGB";
+        case IM_CFA_PATTERN_3x3_RBGGRBBGR:
+            return "3x3 RBGGRBBGR";
+        case IM_CFA_PATTERN_2x2_BWGR:
+            return "2x2 BWGR";
+        case IM_CFA_PATTERN_2x2_RGWB:
+            return "2x2 RGWB";
+        case IM_CFA_PATTERN_2x6_GBBRRGRRGGBB:
+            return "2x6 GBBRRGRRGGBB";
+        default:
+            return "unknown";
+    }
+}
+
 static void rga_dump_channel_info_tabular(int log_level, const char *name,
                                           const im_rect *rect, const rga_buffer_t *image) {
     log_level |= IM_LOG_FORCE;
@@ -220,10 +263,10 @@ static void rga_dump_osd_info(int log_level, const im_osd_t *osd_info) {
            osd_info->block_parm.normal_color.value, osd_info->block_parm.invert_color.value);
 
     IM_LOG(log_level, "\t\tinvert_config:");
-    IM_LOG(log_level, "\t\t\tchannel[0x%x], flags_mode[0x%x], flages_index[%d] threash[0x%x]",
+        IM_LOG(log_level, "\t\t\tchannel[0x%x], flags_mode[0x%x], flags_index[%d] threshold[0x%x]",
            osd_info->invert_config.invert_channel, osd_info->invert_config.flags_mode,
-           osd_info->invert_config.flags_index, osd_info->invert_config.threash);
-    IM_LOG(log_level, "\t\t\tflages: invert[0x%llx], current[0x%llx]",
+           osd_info->invert_config.flags_index, osd_info->invert_config.threshold);
+        IM_LOG(log_level, "\t\t\tflags: invert[0x%llx], current[0x%llx]",
            (unsigned long long)osd_info->invert_config.invert_flags,
            (unsigned long long)osd_info->invert_config.current_flags);
     IM_LOG(log_level, "\t\t\tinvert_mode[%x]",
@@ -238,6 +281,31 @@ static void rga_dump_osd_info(int log_level, const im_osd_t *osd_info) {
     IM_LOG(log_level, "\t\t\tac_swap[0x%x], endian_swap[0x%x], color0[0x%x], color1[0x%x]",
            osd_info->bpp2_info.ac_swap, osd_info->bpp2_info.endian_swap,
            osd_info->bpp2_info.color0.value, osd_info->bpp2_info.color1.value);
+}
+
+static void rga_dump_cfa_info(int log_level, const im_cfa_t *cfa_config) {
+    IM_LOG(log_level, "\tCFA:");
+
+    IM_LOG(log_level, "\t\ttype[%s(0x%x)], pattern[%s(0x%x)]",
+           string_cfa_type(cfa_config->type), cfa_config->type,
+           string_cfa_pattern(cfa_config->pattern), cfa_config->pattern);
+    IM_LOG(log_level, "\t\tsrc1_handle[0x%x], dst1_handle[0x%x]",
+           cfa_config->src1_handle, cfa_config->dst1_handle);
+           IM_LOG(log_level, "\t\tbcsh[%s], dither[%s], clear_low_4bit[%s]",
+           cfa_config->bcsh_en ? "enable" : "disable",
+           (cfa_config->dither & IM_CFA_DITHER_FLAG_ENABLE) ? "enable" : "disable",
+           (cfa_config->dither & IM_CFA_DITHER_FLAG_CLEAR_LOW_4BITS) ? "true" : "false");
+    IM_LOG(log_level, "\t\tsaturation_gain[0x%x], sharpen_gain[0x%x], comps_level[0x%x]",
+           cfa_config->saturation_gain, cfa_config->sharpen_gain, cfa_config->comps_level);
+    IM_LOG(log_level, "\t\tfilter:");
+    IM_LOG(log_level, "\t\t\tmedian[%s], high_pass[%s]",
+           (cfa_config->filter & IM_CFA_FILTER_MEDIAN) ? "enable" : "disable",
+           (cfa_config->filter & IM_CFA_FILTER_HIGH_PASS) ? "enable" : "disable");
+    IM_LOG(log_level, "\t\ta2_modulate:");
+    IM_LOG(log_level, "\t\t\tLPS[%s], HPS[%s], ERR[%s]",
+           (cfa_config->a2_modulate & IM_CFA_A2_MODULATE_LPS) ? "enable" : "disable",
+           (cfa_config->a2_modulate & IM_CFA_A2_MODULATE_HPS) ? "enable" : "disable",
+           (cfa_config->a2_modulate & IM_CFA_A2_MODULATE_ERR) ? "enable" : "disable");
 }
 
 static void rga_dump_gauss_matrix(int log_level, im_size_t ksize, double *matrix) {
@@ -262,17 +330,17 @@ void rga_dump_image(int log_level,
     IM_LOG(log_level, "----------+------------------+----------------------------+----------------------------+-------------------------+----------------------------------------------------------------+----------------------------+--------------");
     //                " src1/pat | afbc32x32(0xff)  | 10000, 10000, 10000, 10000 | 10000, 10000, 10000, 10000 | YCrCb_420SP 10bit(0xff) | 0xffffffff, 0xffffffff, 0xffffffffffffffff, 0xffffffffffffffff | yuv2rgb-bt.601-limit(0xff) | 0xff         "
     rga_dump_channel_info_tabular(log_level, "src", srect, src);
-    if (pat != NULL && rga_is_buffer_valid(*pat))
+    if (pat != NULL && rga_is_buffer_valid(pat))
         rga_dump_channel_info_tabular(log_level, "src1/pat", prect, pat);
     rga_dump_channel_info_tabular(log_level, "dst", drect, dst);
 
     IM_LOG(log_level, "----------+------------------+----------------------------+----------------------------+-------------------------+----------------------------------------------------------------+----------------------------+--------------");
 }
 
-void rga_dump_opt(int log_level, const im_opt_t *opt, const int usage) {
+void rga_dump_opt(int log_level, const im_opt_t *opt, const uint64_t usage) {
     log_level |= IM_LOG_FORCE;
 
-    IM_LOG(log_level, "usage[0x%x]", usage);
+    IM_LOG(log_level, "usage[0x%" PRIx64 "]", usage);
     IM_LOG(log_level, "option:");
 
     IM_LOG(log_level, "\tapi_version[0x%x]", opt->version);
@@ -284,17 +352,17 @@ void rga_dump_opt(int log_level, const im_opt_t *opt, const int usage) {
         IM_LOG(log_level, "\tjob_mode[aync]");
 
     if (usage & IM_HAL_TRANSFORM_ROT_MASK)
-        IM_LOG(log_level, "\trotate[%s(0x%x)]",
+        IM_LOG(log_level, "\trotate[%s(0x%" PRIx64 ")]",
                string_rotate_mode(usage & IM_HAL_TRANSFORM_ROT_MASK),
                usage & IM_HAL_TRANSFORM_ROT_MASK);
 
     if (usage & IM_HAL_TRANSFORM_FLIP_MASK)
-        IM_LOG(log_level, "\tmirror[%s(0x%x)]",
+        IM_LOG(log_level, "\tmirror[%s(0x%" PRIx64 ")]",
                string_flip_mode(usage & IM_HAL_TRANSFORM_FLIP_MASK),
                usage & IM_HAL_TRANSFORM_FLIP_MASK);
 
     if (usage & IM_ALPHA_BLEND_MASK)
-        IM_LOG(log_level, "\tblend_mode[%s(0x%x)], pre-mul[%s]",
+        IM_LOG(log_level, "\tblend_mode[%s(0x%" PRIx64 ")], pre-mul[%s]",
                string_blend_mode(usage & IM_ALPHA_BLEND_MASK), usage & IM_ALPHA_BLEND_MASK,
                (usage & IM_ALPHA_BLEND_PRE_MUL) ? "true" : "false");
 
@@ -309,7 +377,7 @@ void rga_dump_opt(int log_level, const im_opt_t *opt, const int usage) {
 
     if (usage & IM_ALPHA_COLORKEY_MASK) {
         IM_LOG(log_level, "\tcolor_key:");
-        IM_LOG(log_level, "\t\tmode[%s(0x%x)], color_range[min,max] = [0x%x, 0x%x] ",
+        IM_LOG(log_level, "\t\tmode[%s(0x%" PRIx64 ")], color_range[min,max] = [0x%x, 0x%x] ",
                string_colorkey_mode(usage & IM_ALPHA_COLORKEY_MASK),
                usage & IM_ALPHA_COLORKEY_MASK,
                opt->colorkey_range.min, opt->colorkey_range.max);
@@ -332,13 +400,16 @@ void rga_dump_opt(int log_level, const im_opt_t *opt, const int usage) {
                opt->intr_config.write_start, opt->intr_config.write_step);
     }
 
-    if (usage & IM_GAUSS) {
+    if (usage & CONVERT_32BIT_TO_64BIT(IM_GAUSS)) {
         IM_LOG(log_level, "\tGaussian Blur:\n"
                           "\t\tksize[%dx%d], sigma[x,y] = [%lf, %lf]\n",
                opt->gauss_config.ksize.width, opt->gauss_config.ksize.height,
                opt->gauss_config.sigma_x, opt->gauss_config.sigma_y);
         rga_dump_gauss_matrix(log_level, opt->gauss_config.ksize,opt->gauss_config.matrix);
     }
+
+    if (usage & IM_CFA)
+        rga_dump_cfa_info(log_level, &opt->cfa_config);
 }
 
 void rga_dump_info(int log_level,
@@ -346,7 +417,7 @@ void rga_dump_info(int log_level,
                    const rga_buffer_t *src, const rga_buffer_t *dst, const rga_buffer_t *pat,
                    const im_rect *srect, const im_rect *drect, const im_rect *prect,
                    const int acquire_fence_fd, const int *release_fence_fd,
-                   const im_opt_t *opt_ptr, const int usage) {
+                   const im_opt_t *opt_ptr, const uint64_t usage) {
     IM_LOG(log_level, "job_handle[%#x], aquire_fence[%d(%#x)], release_fence_ptr[%p]",
            job_handle, acquire_fence_fd, acquire_fence_fd, release_fence_fd);
 

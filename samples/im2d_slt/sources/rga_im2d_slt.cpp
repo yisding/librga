@@ -385,6 +385,27 @@ int rga_special_test(private_data_t *data, int time,
                     goto CHECK_ERROR;
             }
         }
+
+        /* case: in1, must enable blend */
+        if (data->special_case->input1) {
+            case_index++;
+
+            ret = imcomposite(tmp, src, tmp, IM_ALPHA_BLEND_DST, 1);
+            if (ret != IM_STATUS_SUCCESS) {
+                printf("ID[%d]: %s input1 %d time running failed! %s\n", data->id, data->name, time, imStrError(ret));
+                return slt_rga_error;
+            }
+
+            rga_sync_cache(&dst_img, INVALID_CACHE);
+
+            result_crc = crc32(0xffffffff, (unsigned char *)dst_buf, dst_buf_size);
+            if(g_golden_generate_crc) {
+                save_crcdata(result_crc, data->id, case_index);
+            } else {
+                if (!crc_check(data->id, case_index, result_crc, crc_golden_table))
+                    goto CHECK_ERROR;
+            }
+        }
     }
 
     return 0;
@@ -580,6 +601,9 @@ static int rga_run(void *args, rga_slt_case running_case) {
     }
 #endif /* ifdef __RT_THREAD__ */
 
+    src.rd_mode = data->rd_mode;
+    dst.rd_mode = data->rd_mode;
+
     src_img.img = src;
     src_img.buf = src_buf;
     src_img.fd = src_dma_fd;
@@ -616,9 +640,6 @@ static int rga_run(void *args, rga_slt_case running_case) {
     rga_sync_cache(&src_img, FLUSH_CACHE);
     rga_sync_cache(&tmp_img, FLUSH_CACHE);
     rga_sync_cache(&dst_img, FLUSH_CACHE);
-
-    src.rd_mode = data->rd_mode;
-    dst.rd_mode = data->rd_mode;
 
     if (data->core != IM_SCHEDULER_DEFAULT)
         imconfig(IM_CONFIG_SCHEDULER_CORE, data->core);
@@ -1030,7 +1051,7 @@ int main(int argc, char *argv[])
                 data[pthread_num].num = 0;
                 data[pthread_num].width = g_chip_config.default_width;
                 data[pthread_num].height = g_chip_config.default_height;
-                data[pthread_num].format = g_chip_config.default_format;
+                data[pthread_num].format = RK_FORMAT_YCbCr_420_SP;
                 data[pthread_num].rd_mode = IM_TILE4x4_MODE;
                 data[pthread_num].special_case = &g_chip_config.special_case[RGA_SLT_TILE4x4_INDEX];
                 data[pthread_num].core = IM_SCHEDULER_RGA2_CORE0;
@@ -1046,7 +1067,7 @@ int main(int argc, char *argv[])
                 data[pthread_num].num = 0;
                 data[pthread_num].width = g_chip_config.default_width;
                 data[pthread_num].height = g_chip_config.default_height;
-                data[pthread_num].format = g_chip_config.default_format;
+                data[pthread_num].format = RK_FORMAT_YCbCr_420_SP;
                 data[pthread_num].rd_mode = IM_TILE4x4_MODE;
                 data[pthread_num].special_case = &g_chip_config.special_case[RGA_SLT_TILE4x4_INDEX];
                 data[pthread_num].core = IM_SCHEDULER_RGA2_CORE1;

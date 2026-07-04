@@ -106,6 +106,7 @@ const struct format_table_entry format_table[] = {
     { RK_FORMAT_YCrCb_444_SP,       "crcb444sp" },
 
     { RK_FORMAT_Y8,                 "Y8" },
+    { RK_FORMAT_Y1,                 "Y1" },
 
     { RK_FORMAT_RGBA_1010102,      "rgba1010102" },
     { RK_FORMAT_BGRA_1010102,      "bgra1010102" },
@@ -153,6 +154,8 @@ float get_bpp_from_format_impl(int format) {
     float bpp = 0;
 
     switch (convert_to_rga_format(format)) {
+        case RK_FORMAT_Y1:
+            return 0.125;
         case RK_FORMAT_RGBA2BPP:
             return 0.25;
         case RK_FORMAT_Y4:
@@ -245,6 +248,8 @@ float get_bpp_from_format_impl(int format) {
 
 int get_perPixel_stride_from_format_impl(int format) {
     switch (convert_to_rga_format(format)) {
+        case RK_FORMAT_Y1:
+            return 1;
         case RK_FORMAT_RGBA2BPP:
             return 2;
         case RK_FORMAT_Y4:

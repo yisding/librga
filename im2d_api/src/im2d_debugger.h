@@ -29,16 +29,18 @@ const char *string_flip_mode(uint32_t flip);
 const char *string_mosaic_mode(uint32_t mode);
 const char *string_rop_mode(uint32_t mode);
 const char *string_colorkey_mode(uint32_t mode);
+const char * string_cfa_type(uint32_t type);
+const char * string_cfa_pattern(uint32_t pattern);
 
 void rga_dump_image(int log_level,
                     const rga_buffer_t *src, const rga_buffer_t *dst, const rga_buffer_t *pat,
                     const im_rect *srect, const im_rect *drect, const im_rect *prect);
-void rga_dump_opt(int log_level, const im_opt_t *opt, const int usage);
+void rga_dump_opt(int log_level, const im_opt_t *opt, const uint64_t usage);
 void rga_dump_info(int log_level,
                    const im_job_handle_t job_handle,
                    const rga_buffer_t *src, const rga_buffer_t *dst, const rga_buffer_t *pat,
                    const im_rect *srect, const im_rect *drect, const im_rect *prect,
                    const int acquire_fence_fd, const int *release_fence_fd,
-                   const im_opt_t *opt_ptr, const int usage);
+                   const im_opt_t *opt_ptr, const uint64_t usage);
 
 #endif /* #ifndef _RGA_IM2D_DEBUGGER_H_ */

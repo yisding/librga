@@ -17,6 +17,7 @@ im2d_source = [
     'im2d_api/src/im2d_debugger.cpp',
     'im2d_api/src/im2d_context.cpp',
     'im2d_api/src/im2d_job.cpp',
+    'im2d_api/src/im2d_csc.cpp',
     'im2d_api/src/im2d_impl.cpp',
     'im2d_api/src/im2d.cpp'
 ]
@@ -46,8 +47,8 @@ for source in im2d_source:
 
 LOCAL_CPPPATH = [cwd] + im2d_include + im2d_3rdparty_include
 LOCAL_CCFLAGS = ' -x c -DLINUX -DRT_THREAD -DRGA_SYNC_DISABLE -DRGA_UTILS_DRM_DISABLE'
-LOCAL_CCFLAGS += ' -lm -D_USE_MATH_DEFINES -Wno-unused-command-line-argument'
-LOCAL_CCFLAGS += ' -Wno-maybe-uninitialized -Wno-unused-but-set-variable -Wno-unused-variable -Wno-incompatible-pointer-types -Wno-format -Wno-initializer-overrides'
+LOCAL_CCFLAGS += ' -lm -D_USE_MATH_DEFINES'
+LOCAL_CCFLAGS += ' -Wno-maybe-uninitialized -Wno-unused-but-set-variable -Wno-unused-variable -Wno-incompatible-pointer-types -Wno-format'
 LOCAL_CCFLAGS += ' -w'
 
 group = DefineGroup('librga', src, depend = ['RT_USING_RGA'], LOCAL_CPPPATH = LOCAL_CPPPATH, LOCAL_CCFLAGS = LOCAL_CCFLAGS, CPPPATH = im2d_public_include)

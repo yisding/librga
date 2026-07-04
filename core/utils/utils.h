@@ -42,6 +42,7 @@ bool is_bpp_format(int format);
 bool is_yuv_format(int format);
 bool is_rgb_format(int format);
 bool is_alpha_format(int format);
+bool is_full_range(int color_space_mode);
 
 int convert_to_rga_format(int ex_format);
 

@@ -1,7 +1,7 @@
 project(
     'librga',
     'cpp',
-    version : '2.2.0',
+    version : '2.1.0',
     meson_version : '>=0.47.0',
     default_options : ['warning_level=3', 'cpp_std=c++14']
 )
@@ -28,6 +28,7 @@ librga_srcs = [
     'im2d_api/src/im2d_debugger.cpp',
     'im2d_api/src/im2d_context.cpp',
     'im2d_api/src/im2d_job.cpp',
+    'im2d_api/src/im2d_csc.cpp',
     'im2d_api/src/im2d_impl.cpp',
     'im2d_api/src/im2d.cpp',
 ]
