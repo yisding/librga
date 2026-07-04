@@ -70,6 +70,99 @@ using namespace android;
     })
 #define GET_LCM(n1, n2, gcd) (((n1) * (n2)) / gcd)
 
+static inline void rga_apply_p010_p210_format(rga_buffer_t *image, rga_info_t *info) {
+    if (!image)
+        return;
+
+    switch (image->format) {
+        case RK_FORMAT_P010:
+            image->format = RK_FORMAT_YCbCr_420_SP_10B;
+            if (info) {
+                info->is_10b_compact = 1;
+                info->is_10b_endian = 1;
+            }
+            break;
+        case RK_FORMAT_P210:
+            image->format = RK_FORMAT_YCbCr_422_SP_10B;
+            if (info) {
+                info->is_10b_compact = 1;
+                info->is_10b_endian = 1;
+            }
+            break;
+        default:
+            break;
+    }
+}
+
+static inline void rga_set_10bit_mode(rga_img_info_t *img, const rga_info_t *info, bool allow_tile_mode) {
+    if (!img || !info)
+        return;
+
+    if (img->rd_mode == raster_mode || (allow_tile_mode && img->rd_mode == tile_mode)) {
+        img->is_10b_compact = !!info->is_10b_compact;
+        img->is_10b_endian = !!info->is_10b_endian;
+    }
+}
+
+static inline bool rga_is_10bit_yuv_req_format(uint32_t format) {
+    switch (format) {
+        case RK_FORMAT_YCbCr_420_SP_10B:
+        case RK_FORMAT_YCrCb_420_SP_10B:
+        case RK_FORMAT_YCbCr_422_SP_10B:
+        case RK_FORMAT_YCrCb_422_SP_10B:
+        case RK_FORMAT_YCbCr_420_SP_10B >> 8:
+        case RK_FORMAT_YCrCb_420_SP_10B >> 8:
+        case RK_FORMAT_YCbCr_422_SP_10B >> 8:
+        case RK_FORMAT_YCrCb_422_SP_10B >> 8:
+            return true;
+        default:
+            return false;
+    }
+}
+
+static inline bool rga_is_req_image_active(const rga_img_info_t *img) {
+    if (!img)
+        return false;
+
+    return img->enable || img->format || img->yrgb_addr || img->uv_addr || img->v_addr ||
+           img->act_w || img->act_h || img->vir_w || img->vir_h;
+}
+
+static IM_STATUS rga_check_rga2_compat_image(const char *name, const rga_img_info_t *img) {
+    if (!rga_is_req_image_active(img))
+        return IM_STATUS_NOERROR;
+
+    if (img->rd_mode != raster_mode) {
+        IM_LOGW("RGA2 compatibility path does not support %s rd_mode[%u].", name, img->rd_mode);
+        return IM_STATUS_NOT_SUPPORTED;
+    }
+
+    if (rga_is_10bit_yuv_req_format(img->format) && (img->is_10b_compact || img->is_10b_endian)) {
+        IM_LOGW("RGA2 compatibility path does not support %s padded/incompact 10-bit format[0x%x] compact[%u] endian[%u].",
+                name, img->format, img->is_10b_compact, img->is_10b_endian);
+        return IM_STATUS_NOT_SUPPORTED;
+    }
+
+    return IM_STATUS_NOERROR;
+}
+
+static IM_STATUS rga_check_rga2_compat_req(const struct rga_req *req) {
+    IM_STATUS ret;
+
+    if (!req)
+        return IM_STATUS_NOERROR;
+
+    ret = rga_check_rga2_compat_image("src", &req->src);
+    if (ret != IM_STATUS_NOERROR)
+        return ret;
+
+    ret = rga_check_rga2_compat_image("dst", &req->dst);
+    if (ret != IM_STATUS_NOERROR)
+        return ret;
+
+    return rga_check_rga2_compat_image("pat", &req->pat);
+}
+
 #ifdef RT_THREAD
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -1394,7 +1487,8 @@ IM_STATUS rga_check_format(const char *name, rga_buffer_t info, im_rect rect, in
         ret = rga_yuv_legality_check(name, info, rect);
         if (ret != IM_STATUS_SUCCESS)
             return ret;
-    } else if (format == RK_FORMAT_YCrCb_420_SP_10B || format == RK_FORMAT_YCbCr_420_SP_10B) {
+    } else if (format == RK_FORMAT_YCrCb_420_SP_10B || format == RK_FORMAT_YCbCr_420_SP_10B ||
+               format == RK_FORMAT_P010) {
         if (~format_usage & IM_RGA_SUPPORT_FORMAT_YUV_420_SEMI_PLANNER_10_BIT) {
             IM_LOGW("%s unsupported YUV420 semi-planner 10bit format, format = 0x%x(%s)\n%s",
                     name, info.format, translate_format_str(info.format),
@@ -1406,7 +1500,8 @@ IM_STATUS rga_check_format(const char *name, rga_buffer_t info, im_rect rect, in
         if (ret != IM_STATUS_SUCCESS)
             return ret;
         IM_LOGW("If it is an RK encoder output, it needs to be aligned with an odd multiple of 256.\n");
-    } else if (format == RK_FORMAT_YCrCb_422_SP_10B || format == RK_FORMAT_YCbCr_422_SP_10B) {
+    } else if (format == RK_FORMAT_YCrCb_422_SP_10B || format == RK_FORMAT_YCbCr_422_SP_10B ||
+               format == RK_FORMAT_P210) {
         if (~format_usage & IM_RGA_SUPPORT_FORMAT_YUV_422_SEMI_PLANNER_10_BIT) {
             IM_LOGW("%s unsupported YUV422 semi-planner 10bit format, format = 0x%x(%s)\n%s",
                     name, info.format, translate_format_str(info.format),
@@ -2567,6 +2662,7 @@ IM_STATUS rga_task_submit(im_job_handle_t job_handle, rga_buffer_t src, rga_buff
         ret = rga_set_buffer_info((usage & IM_UPDATE_LUT) ? "lut" : "src", src, &srcinfo);
         if (ret <= 0)
             return (IM_STATUS)ret;
+        rga_apply_p010_p210_format(&src, &srcinfo);
         rga_set_rect(&srcinfo.rect, srect.x, srect.y, src.width, src.height, src.wstride, src.hstride, src.format);
     }
 
@@ -2574,6 +2670,7 @@ IM_STATUS rga_task_submit(im_job_handle_t job_handle, rga_buffer_t src, rga_buff
         ret = rga_set_buffer_info("dst", dst, &dstinfo);
         if (ret <= 0)
             return (IM_STATUS)ret;
+        rga_apply_p010_p210_format(&dst, &dstinfo);
         rga_set_rect(&dstinfo.rect, drect.x, drect.y, dst.width, dst.height, dst.wstride, dst.hstride, dst.format);
     }
 
@@ -2581,6 +2678,7 @@ IM_STATUS rga_task_submit(im_job_handle_t job_handle, rga_buffer_t src, rga_buff
         ret = rga_set_buffer_info("src1/pat", pat, &patinfo);
         if (ret <= 0)
             return (IM_STATUS)ret;
+        rga_apply_p010_p210_format(&pat, &patinfo);
         rga_set_rect(&patinfo.rect, prect.x, prect.y, pat.width, pat.height, pat.wstride, pat.hstride, pat.format);
     }
 
@@ -2954,6 +3052,10 @@ IM_STATUS rga_task_submit(im_job_handle_t job_handle, rga_buffer_t src, rga_buff
         switch (session->driver_type) {
             case RGA_DRIVER_IOC_RGA1:
             case RGA_DRIVER_IOC_RGA2:
+                ret = rga_check_rga2_compat_req(&req);
+                if (ret != IM_STATUS_NOERROR)
+                    goto release_resource;
+
                 memset(&compat_req, 0x0, sizeof(compat_req));
                 NormalRgaCompatModeConvertRga2(&compat_req, &req);
 
@@ -4249,6 +4351,11 @@ int generate_blit_req(struct rga_req *ioc_req, rga_info_t *src, rga_info_t *dst,
     if (src1)
         rgaReg.pat.rd_mode = src1->rd_mode ? src1->rd_mode : raster_mode;
 
+    rga_set_10bit_mode(&rgaReg.src, src, false);
+    rga_set_10bit_mode(&rgaReg.dst, dst, true);
+    if (src1)
+        rga_set_10bit_mode(&rgaReg.pat, src1, false);
+
     rgaReg.in_fence_fd = dst->in_fence_fd;
     rgaReg.core = dst->core;
     rgaReg.priority = dst->priority;
@@ -4477,6 +4584,8 @@ int generate_fill_req(struct rga_req *ioc_req, rga_info_t *dst) {
     /* rga3 rd_mode */
     /* If rd_mode is not configured, raster mode is executed by default. */
     rgaReg.dst.rd_mode = dst->rd_mode ? dst->rd_mode : raster_mode;
+
+    rga_set_10bit_mode(&rgaReg.dst, dst, true);
 
     rgaReg.in_fence_fd = dst->in_fence_fd;
     rgaReg.core = dst->core;
@@ -5067,15 +5176,34 @@ int generate_color_palette_req(struct rga_req *ioc_req, rga_info_t *src, rga_inf
     if (lut)
         rgaReg.pat.rd_mode = lut->rd_mode ? lut->rd_mode : raster_mode;
 
+    rga_set_10bit_mode(&rgaReg.src, src, false);
+    rga_set_10bit_mode(&rgaReg.dst, dst, true);
+    if (lut)
+        rga_set_10bit_mode(&rgaReg.pat, lut, false);
+
     rgaReg.in_fence_fd = dst->in_fence_fd;
     rgaReg.core = dst->core;
     rgaReg.priority = dst->priority;
 
     if (!(lutFd == -1 && lutBuf == NULL)) {
+        void *update_req = &rgaReg;
+        struct rga2_req update_compat_req;
+
         rgaReg.fading.g = 0xff;
         rgaReg.render_mode = update_palette_table_mode;
 
-        if(ioctl(session->rga_dev_fd, RGA_BLIT_SYNC, &rgaReg) != 0) {
+        if (session->driver_type == RGA_DRIVER_IOC_RGA1 ||
+            session->driver_type == RGA_DRIVER_IOC_RGA2) {
+            ret = rga_check_rga2_compat_req(&rgaReg);
+            if (ret != IM_STATUS_NOERROR)
+                return ret;
+
+            memset(&update_compat_req, 0x0, sizeof(update_compat_req));
+            NormalRgaCompatModeConvertRga2(&update_compat_req, &rgaReg);
+            update_req = &update_compat_req;
+        }
+
+        if(ioctl(session->rga_dev_fd, RGA_BLIT_SYNC, update_req) != 0) {
             printf("update palette table mode ioctl err\n");
             return -1;
         }
@@ -5267,6 +5395,8 @@ int generate_update_lut_req(struct rga_req *ioc_req, rga_info_t *lut) {
     /* If rd_mode is not configured, raster mode is executed by default. */
     if (lut)
         rgaReg.pat.rd_mode = lut->rd_mode ? lut->rd_mode : raster_mode;
+
+    rga_set_10bit_mode(&rgaReg.pat, lut, false);
 
     rgaReg.in_fence_fd = lut->in_fence_fd;
     rgaReg.core = lut->core;

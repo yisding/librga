@@ -68,6 +68,8 @@ bool is_yuv_format(int format) {
         case RK_FORMAT_YCbCr_444_SP:
         case RK_FORMAT_YCrCb_444_SP:
         case RK_FORMAT_YUV_444_10B:
+        case RK_FORMAT_P010:
+        case RK_FORMAT_P210:
             ret = true;
             break;
     }
