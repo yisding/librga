@@ -4024,6 +4024,25 @@ int generate_blit_req(struct rga_req *ioc_req, rga_info_t *src, rga_info_t *dst,
     clip.ymin = 0;
     clip.ymax = dstVirH - 1;
 
+    /*
+     * The kernel ABI carries 10-bit vir_w as a BYTE stride (the legacy BSP
+     * contract the RGA2/RGA3 register writers program literally).  im2d
+     * callers supply wstride in pixels, so convert here — after the clip
+     * window (which stays in pixels) and before the plane-offset and
+     * vir_w assignments below.  compact NV15/NV20 pack 10 bits per pixel;
+     * incompact P010/P210 (is_10b_compact carries the kernel compact_mode
+     * value, 1 = incompact) use 16-bit containers.
+     */
+    if (rga_is_10bit_yuv_req_format(relSrcRect.format))
+        srcVirW = (src && src->is_10b_compact) ? srcVirW * 2
+                                               : srcVirW * 10 / 8;
+    if (rga_is_10bit_yuv_req_format(relDstRect.format))
+        dstVirW = (dst && dst->is_10b_compact) ? dstVirW * 2
+                                               : dstVirW * 10 / 8;
+    if (src1 && rga_is_10bit_yuv_req_format(relSrc1Rect.format))
+        src1VirW = src1->is_10b_compact ? src1VirW * 2
+                                        : src1VirW * 10 / 8;
+
     if  (NormalRgaIsRgbFormat(RkRgaGetRgaFormat(relSrcRect.format)) &&
          (RkRgaGetRgaFormat(relSrcRect.format) != RK_FORMAT_RGB_565 ||
          RkRgaGetRgaFormat(relSrcRect.format) != RK_FORMAT_BGR_565) &&
@@ -4481,6 +4500,11 @@ int generate_fill_req(struct rga_req *ioc_req, rga_info_t *dst) {
     clip.xmax = dstActW - 1;
     clip.ymin = 0;
     clip.ymax = dstActH - 1;
+
+    /* See generate_blit_req: kernel 10-bit vir_w is a byte stride. */
+    if (rga_is_10bit_yuv_req_format(relDstRect.format))
+        dstVirW = (dst && dst->is_10b_compact) ? dstVirW * 2
+                                               : dstVirW * 10 / 8;
 
     switch (session->driver_type) {
         case RGA_DRIVER_IOC_RGA1:
