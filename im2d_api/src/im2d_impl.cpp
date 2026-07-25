@@ -4025,26 +4025,38 @@ int generate_blit_req(struct rga_req *ioc_req, rga_info_t *src, rga_info_t *dst,
     clip.ymax = dstVirH - 1;
 
     /*
-     * The kernel ABI carries RASTER 10-bit vir_w as a BYTE stride (the
-     * legacy BSP contract the RGA2/RGA3 register writers program
+     * The kernel ABI carries uncompressed 10-bit vir_w as a BYTE stride
+     * (the legacy BSP contract the RGA2/RGA3 register writers program
      * literally).  im2d callers supply wstride in pixels, so convert here
      * — after the clip window (which stays in pixels) and before the
      * plane-offset and vir_w assignments below.  compact NV15/NV20 pack
      * 10 bits per pixel; incompact P010/P210 (is_10b_compact carries the
      * kernel compact_mode value, 1 = incompact) use 16-bit containers.
-     * Tile/FBC 10-bit keep the pixel convention (the BSP tile/FBC stride
-     * math scales vir_w itself), so only raster converts.
+     *
+     * This covers TILE as well as RASTER: the BSP derives both strides
+     * from vir_w * pixel_width (rga3_reg_info.c) and pixel_width stays 1
+     * for every 10-bit format — the extra * 8 in the TILE expression is
+     * the eight-lines-per-tile-block factor, not a pixel-depth scale —
+     * and rga_convert_addr() offsets the UV plane by a flat
+     * vir_w * vir_h regardless of rd_mode.
+     *
+     * FBC is the genuine exception and keeps the pixel convention: its
+     * register stride is the format-independent header stride, and the
+     * payload stride applies the format's own bytes-per-pixel to vir_w.
      */
     if (rga_is_10bit_yuv_req_format(relSrcRect.format) &&
-        (src == NULL || src->rd_mode == 0 || src->rd_mode == raster_mode))
+        (src == NULL || src->rd_mode == 0 || src->rd_mode == raster_mode ||
+         src->rd_mode == tile_mode))
         srcVirW = (src && src->is_10b_compact) ? srcVirW * 2
                                                : srcVirW * 10 / 8;
     if (rga_is_10bit_yuv_req_format(relDstRect.format) &&
-        (dst == NULL || dst->rd_mode == 0 || dst->rd_mode == raster_mode))
+        (dst == NULL || dst->rd_mode == 0 || dst->rd_mode == raster_mode ||
+         dst->rd_mode == tile_mode))
         dstVirW = (dst && dst->is_10b_compact) ? dstVirW * 2
                                                : dstVirW * 10 / 8;
     if (src1 && rga_is_10bit_yuv_req_format(relSrc1Rect.format) &&
-        (src1->rd_mode == 0 || src1->rd_mode == raster_mode))
+        (src1->rd_mode == 0 || src1->rd_mode == raster_mode ||
+         src1->rd_mode == tile_mode))
         src1VirW = src1->is_10b_compact ? src1VirW * 2
                                         : src1VirW * 10 / 8;
 
@@ -4506,9 +4518,13 @@ int generate_fill_req(struct rga_req *ioc_req, rga_info_t *dst) {
     clip.ymin = 0;
     clip.ymax = dstActH - 1;
 
-    /* See generate_blit_req: kernel RASTER 10-bit vir_w is a byte stride. */
+    /*
+     * See generate_blit_req: kernel uncompressed 10-bit vir_w is a byte
+     * stride, for TILE as well as RASTER.  FBC keeps the pixel convention.
+     */
     if (rga_is_10bit_yuv_req_format(relDstRect.format) &&
-        (dst == NULL || dst->rd_mode == 0 || dst->rd_mode == raster_mode))
+        (dst == NULL || dst->rd_mode == 0 || dst->rd_mode == raster_mode ||
+         dst->rd_mode == tile_mode))
         dstVirW = (dst && dst->is_10b_compact) ? dstVirW * 2
                                                : dstVirW * 10 / 8;
 
