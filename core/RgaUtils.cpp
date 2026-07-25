@@ -357,7 +357,11 @@ int get_buf_from_file_impl(void *buf, int f, int sw, int sh, int index) {
         fprintf(stderr, "Could not open %s\n", filePath);
         return -EINVAL;
     }
-    fread(buf, get_buf_size_by_w_h_f(sw, sh, f), 1, file);
+    if (fread(buf, get_buf_size_by_w_h_f(sw, sh, f), 1, file) != 1) {
+        fprintf(stderr, "Could not read %s\n", filePath);
+        fclose(file);
+        return -EIO;
+    }
     fclose(file);
 
     return 0;
@@ -383,7 +387,11 @@ int get_buf_from_file_FBC_impl(void *buf, int f, int sw, int sh, int index) {
         fprintf(stderr, "Could not open %s\n", filePath);
         return -EINVAL;
     }
-    fread(buf, get_buf_size_by_w_h_f(sw, sh, f) * 1.5, 1, file);
+    if (fread(buf, get_buf_size_by_w_h_f(sw, sh, f) * 1.5, 1, file) != 1) {
+        fprintf(stderr, "Could not read %s\n", filePath);
+        fclose(file);
+        return -EIO;
+    }
     fclose(file);
 
     return 0;

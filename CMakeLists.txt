@@ -20,12 +20,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -O2 -pthread")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O2 -pthread -lm -Wno-unused-command-line-argument")
 set(RGA_SAMPLES_ENABLE true)
 
+# Every supported CMAKE_BUILD_TARGET below adds -DLINUX, and meson.build adds
+# it unconditionally, so define it once here.  Doing it per-branch left a hole:
+# configuring without CMAKE_BUILD_TARGET matched no branch, and the sources
+# that declare their locals under #ifdef LINUX / #ifdef ANDROID (RgaUtils.cpp
+# get_buf_from_file_impl() and friends) then failed to compile with an
+# undeclared-identifier error rather than a readable configuration error.
+add_compile_options(-DLINUX)
+
 add_library(COMMON_LIBS INTERFACE)
 
 if(CMAKE_BUILD_TARGET STREQUAL android_ndk)
     message("cmake build android ndk")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -DLOG_TAG=librga")
-    add_compile_options(-DLINUX)
     add_compile_options(-DANDROID_VNDK)
     string(REPLACE "-DANDROID" "" CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 
@@ -36,12 +43,10 @@ endif()
 
 if(CMAKE_BUILD_TARGET STREQUAL buildroot)
     message("cmake build buildroot")
-    add_compile_options(-DLINUX)
 endif()
 
 if(CMAKE_BUILD_TARGET STREQUAL cmake_linux)
     message("RGA build with cmake")
-    add_compile_options(-DLINUX)
     # TO support pass external CMAKE_CXX_FLAGS
     set(CMAKE_CXX_FLAGS_EXT "${CMAKE_CXX_FLAGS} -fdata-sections -ffunction-sections -fno-exceptions -fno-rtti")
 
@@ -56,7 +61,7 @@ endif()
 
 if (CMAKE_BUILD_TARGET STREQUAL rt_thread)
     message("cmake build RT-Thread")
-    add_compile_options(-DLINUX -DRT_THREAD -DRGA_SYNC_DISABLE -DRGA_UTILS_DRM_DISABLE)
+    add_compile_options(-DRT_THREAD -DRGA_SYNC_DISABLE -DRGA_UTILS_DRM_DISABLE)
 
     set(IM2D_RT_THREAD_INCLUDE
         ${RTOS_BSP}/include/

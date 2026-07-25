@@ -128,7 +128,11 @@ int read_image_from_fbc_file(void *buf, const char *path, int sw, int sh, int fm
 
     size = sw * sh * get_bpp_from_format(fmt) * 1.5;
 
-    fread(buf, size, 1, file);
+    if (fread(buf, size, 1, file) != 1) {
+        fprintf(stderr, "Could not read %s\n", filePath);
+        fclose(file);
+        return -EIO;
+    }
 
     fclose(file);
 
@@ -151,7 +155,11 @@ int read_image_from_file(void *buf, const char *path, int sw, int sh, int fmt, i
 
     size = sw * sh * get_bpp_from_format(fmt);
 
-    fread(buf, size, 1, file);
+    if (fread(buf, size, 1, file) != 1) {
+        fprintf(stderr, "Could not read %s\n", filePath);
+        fclose(file);
+        return -EIO;
+    }
 
     fclose(file);
 
