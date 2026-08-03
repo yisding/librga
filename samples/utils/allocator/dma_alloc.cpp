@@ -90,6 +90,71 @@ int dma_sync_cpu_to_device(int fd) {
     return ioctl(fd, DMA_BUF_IOCTL_SYNC, &sync);
 }
 
+/*
+ * Strip one heap-name qualifier ("-uncached", "-dma32") out of a heap path,
+ * writing the result to out. Returns 0 when the qualifier was present.
+ */
+static int heap_path_drop(const char *path, const char *qualifier, char *out, size_t out_len) {
+    const char *hit = strstr(path, qualifier);
+    size_t head;
+
+    if (hit == NULL)
+        return -1;
+
+    head = (size_t)(hit - path);
+    if (head + strlen(hit + strlen(qualifier)) + 1 > out_len)
+        return -1;
+
+    memcpy(out, path, head);
+    strcpy(out + head, hit + strlen(qualifier));
+
+    return 0;
+}
+
+/*
+ * Open a dma_heap, falling back when the requested one does not exist.
+ *
+ * The uncached and dma32 heap variants are Rockchip BSP additions; a mainline
+ * kernel only exports "system" and CMA, so a hardcoded uncached/dma32 path
+ * fails outright there. Degrade instead of dying, loudly, because both
+ * qualifiers carry meaning the caller may depend on: dropping "-uncached"
+ * yields cachable memory, so CPU access has to be bracketed with
+ * dma_sync_cpu_to_device()/dma_sync_device_to_cpu(); dropping "-dma32" may
+ * place the buffer above 4G, which the kernel refuses to hand to RGA2 and
+ * will instead route to an RGA3 core.
+ */
+static int dma_heap_open(const char *path) {
+    char candidates[4][128];
+    int count = 0;
+    int i;
+
+    snprintf(candidates[count++], sizeof(candidates[0]), "%s", path);
+    if (heap_path_drop(path, "-dma32", candidates[count], sizeof(candidates[0])) == 0)
+        count++;
+    if (heap_path_drop(path, "-uncached", candidates[count], sizeof(candidates[0])) == 0)
+        count++;
+    if (count > 2 &&
+        heap_path_drop(candidates[count - 1], "-dma32", candidates[count], sizeof(candidates[0])) == 0)
+        count++;
+
+    for (i = 0; i < count; i++) {
+        int heap_fd = open(candidates[i], O_RDWR);
+
+        if (heap_fd >= 0) {
+            if (i > 0)
+                printf("dma_heap %s is absent, falling back to %s "
+                       "(cachable memory needs explicit dma_sync_*; "
+                       "above-4G memory is not usable by RGA2)\n",
+                       path, candidates[i]);
+            return heap_fd;
+        }
+    }
+
+    printf("open %s fail, and no fallback heap is available!\n", path);
+
+    return -1;
+}
+
 int dma_buf_alloc(const char *path, size_t size, int *fd, void **va) {
     int ret;
     void *mmap_va;
@@ -97,9 +162,8 @@ int dma_buf_alloc(const char *path, size_t size, int *fd, void **va) {
     struct dma_heap_allocation_data buf_data;
 
     /* open dma_heap fd */
-    dma_heap_fd = open(path, O_RDWR);
+    dma_heap_fd = dma_heap_open(path);
     if (dma_heap_fd < 0) {
-        printf("open %s fail!\n", path);
         return dma_heap_fd;
     }
 
